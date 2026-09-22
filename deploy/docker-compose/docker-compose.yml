@@ -1,0 +1,14 @@
+services:
+  frontend:
+    build: ../../app/frontend
+    ports: ["3000:80"]
+  backend:
+    build: ../../app/backend
+    ports: ["8080:8080"]
+    environment:
+      DB_HOST: mysql
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_DATABASE: appdb
+      MYSQL_ROOT_PASSWORD: change-this-locally

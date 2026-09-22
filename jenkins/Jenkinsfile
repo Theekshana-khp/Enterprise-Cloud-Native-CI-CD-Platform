@@ -1,0 +1,12 @@
+pipeline {
+  agent any
+  parameters { string(name: 'IMAGE_TAG', description: 'Docker image version to deploy') }
+  stages {
+    stage('Deploy') {
+      steps { sh 'echo Deploy image version ${IMAGE_TAG} to Kubernetes' }
+    }
+    stage('Health Check') {
+      steps { sh 'echo Check backend /api/health endpoint' }
+    }
+  }
+}
