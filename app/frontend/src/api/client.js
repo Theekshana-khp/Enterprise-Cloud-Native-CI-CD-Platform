@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_ROOT = 'http://localhost:8080/api';
+const API_ROOT = '/api';
 
 export const apiClient = axios.create({
   baseURL: API_ROOT,
