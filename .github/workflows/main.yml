@@ -53,8 +53,8 @@ jobs:
 
       - name: Build Docker images
         run: |
-          docker build -t $ECR_REGISTRY/task-manager/frontend:$IMAGE_TAG ./frontend
-          docker build -t $ECR_REGISTRY/task-manager/backend:$IMAGE_TAG ./backend
+          docker build -t $ECR_REGISTRY/task-manager/frontend:$IMAGE_TAG app/frontend
+          docker build -t $ECR_REGISTRY/task-manager/backend:$IMAGE_TAG app/backend
 
       - name: Push Docker images to ECR
         run: |
