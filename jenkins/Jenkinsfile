@@ -63,7 +63,7 @@ pipeline {
 
                     # Check that backend is healthy
                     if curl --fail --retry 10 --retry-delay 5 \
-                      http://localhost:8080/api/health; then
+                      http://localhost:8081/api/health; then
 
                       echo "$IMAGE_TAG" > "$DEPLOY_DIR/.current_image_tag"
                       echo "Deployment successful."
