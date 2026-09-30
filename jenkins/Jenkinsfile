@@ -1,12 +1,95 @@
 pipeline {
-  agent any
-  parameters { string(name: 'IMAGE_TAG', description: 'Docker image version to deploy') }
-  stages {
-    stage('Deploy') {
-      steps { sh 'echo Deploy image version ${IMAGE_TAG} to Kubernetes' }
+    agent any
+
+    environment {
+        AWS_REGION   = 'us-east-1'
+        ECR_REGISTRY = '474632925843.dkr.ecr.us-east-1.amazonaws.com'
+        DEPLOY_DIR   = '/home/ubuntu/task-manager'
     }
-    stage('Health Check') {
-      steps { sh 'echo Check backend /api/health endpoint' }
+
+    parameters {
+        string(
+            name: 'IMAGE_TAG',
+            defaultValue: '',
+            description: 'Image version sent by GitHub Actions'
+        )
     }
-  }
+
+    stages {
+        stage('Validate version') {
+            steps {
+                script {
+                    if (!params.IMAGE_TAG?.trim()) {
+                        error('IMAGE_TAG is required')
+                    }
+                }
+
+                echo "New version: ${params.IMAGE_TAG}"
+            }
+        }
+
+        stage('Deploy from ECR') {
+            steps {
+                sh '''
+                    set -eu
+
+                    export IMAGE_TAG="${IMAGE_TAG}"
+
+                    # Get ECR permission using the EC2 IAM role
+                    aws ecr get-login-password --region "$AWS_REGION" \
+                      | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+                    # Remember the currently working version for rollback
+                    if [ -f "$DEPLOY_DIR/.current_image_tag" ]; then
+                      PREVIOUS_TAG=$(cat "$DEPLOY_DIR/.current_image_tag")
+                    else
+                      PREVIOUS_TAG=""
+                    fi
+
+                    echo "Previous version: ${PREVIOUS_TAG:-none}"
+                    echo "Deploying version: $IMAGE_TAG"
+
+                    # Download the exact frontend and backend images from ECR
+                    docker compose \
+                      --env-file "$DEPLOY_DIR/.env" \
+                      -f "$DEPLOY_DIR/docker-compose.yml" \
+                      pull frontend backend
+
+                    # Start the new version
+                    docker compose \
+                      --env-file "$DEPLOY_DIR/.env" \
+                      -f "$DEPLOY_DIR/docker-compose.yml" \
+                      up -d frontend backend
+
+                    # Check that backend is healthy
+                    if curl --fail --retry 10 --retry-delay 5 \
+                      http://localhost:8080/api/health; then
+
+                      echo "$IMAGE_TAG" > "$DEPLOY_DIR/.current_image_tag"
+                      echo "Deployment successful."
+
+                    else
+                      echo "Health check failed."
+
+                      # Restore previous version if one exists
+                      if [ -n "$PREVIOUS_TAG" ]; then
+                        export IMAGE_TAG="$PREVIOUS_TAG"
+
+                        docker compose \
+                          --env-file "$DEPLOY_DIR/.env" \
+                          -f "$DEPLOY_DIR/docker-compose.yml" \
+                          pull frontend backend
+
+                        docker compose \
+                          --env-file "$DEPLOY_DIR/.env" \
+                          -f "$DEPLOY_DIR/docker-compose.yml" \
+                          up -d frontend backend
+                      fi
+
+                      exit 1
+                    fi
+                '''
+            }
+        }
+    }
 }
