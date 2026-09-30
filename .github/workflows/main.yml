@@ -31,7 +31,7 @@ jobs:
           npm run build
 
       - name: Set up Java
-        uses: actions/setup-java@v4$IMAGE_TAG
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
