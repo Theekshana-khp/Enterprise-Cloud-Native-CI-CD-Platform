@@ -35,9 +35,9 @@ export default function LoginPage() {
         <div className="auth-visual-inner">
           <div className="auth-brand-large">
             <span className="brand-icon">✓</span>
-            TaskFlows3
+            TaskFlows
           </div>
-          <h2>Plan and ship work with clarity.</h2>
+          <h2>Plan, track, and ship work with clarity.</h2>
           <p>Modern task management with kanban boards, deadlines, and team-ready dashboards.</p>
           <div className="auth-preview-card">
             <div className="preview-stat">
