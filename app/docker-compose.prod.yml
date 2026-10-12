@@ -16,7 +16,7 @@ services:
       retries: 10
 
   backend:
-    image: ${ECR_REGISTRY}/task-manager/backend:v1
+    image: ${ECR_REGISTRY}/task-manager/backend:${IMAGE_TAG}
     restart: unless-stopped
     ports:
       - "127.0.0.1:8081:8080"
@@ -30,7 +30,7 @@ services:
         condition: service_healthy
 
   frontend:
-    image: ${ECR_REGISTRY}/task-manager/frontend:v2
+    image: ${ECR_REGISTRY}/task-manager/frontend:${IMAGE_TAG}
     restart: unless-stopped
     ports:
       - "80:80"
