@@ -37,7 +37,7 @@ export default function LoginPage() {
             <span className="brand-icon">✓</span>
             TaskFlows
           </div>
-          <h2>plan ,track, and ship work with clarity.</h2>
+          <h2>plan and ship work with clarity.</h2>
           <p>Modern task management with kanban boards, deadlines, and team-ready dashboards.</p>
           <div className="auth-preview-card">
             <div className="preview-stat">
