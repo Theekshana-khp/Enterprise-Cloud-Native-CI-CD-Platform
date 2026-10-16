@@ -256,7 +256,7 @@ resource "aws_instance" "task_manager" {
     echo "Jenkins and Docker installation completed"
   EOF
 
-  # Changing user_data replaces the EC2 instance
+
   user_data_replace_on_change = true
 
   tags = {
