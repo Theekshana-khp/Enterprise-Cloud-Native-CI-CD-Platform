@@ -218,7 +218,7 @@ resource "aws_instance" "task_manager" {
       unzip \
       maven
 
-    # 3. Install AWS CLI v2
+    # 3. Install AWS CLI  v2
     cd /tmp
     curl -fsSL \
       "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" \
