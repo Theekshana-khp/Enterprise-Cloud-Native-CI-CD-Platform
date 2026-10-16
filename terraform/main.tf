@@ -215,7 +215,8 @@ resource "aws_instance" "task_manager" {
       openjdk-21-jre \
       docker.io \
       docker-compose-v2 \
-      unzip
+      unzip \
+      maven
 
     # 3. Install AWS CLI v2
     cd /tmp
