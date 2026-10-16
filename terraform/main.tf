@@ -162,7 +162,7 @@ resource "aws_ecr_repository" "frontend" {
 
   tags = {
     Name    = "task-manager-frontend"
-    Project = "Task-Manager"
+    Project = "Task-Manager "
   }
 }
 
