@@ -38,7 +38,7 @@ export default function LoginPage() {
             TaskFlows
           </div>
           <h2>plan ,track, and ship work with clarity.</h2>
-          <p>Modern task management with kanban board , deadlines, and team-ready dashboards.</p>
+          <p>Modern task management with kanban boards, deadlines, and team-ready dashboards.</p>
           <div className="auth-preview-card">
             <div className="preview-stat">
               <strong>24</strong>
