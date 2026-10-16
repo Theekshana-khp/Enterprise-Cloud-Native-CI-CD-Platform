@@ -1,3 +1,4 @@
+```groovy
 pipeline {
     agent any
 
@@ -5,6 +6,7 @@ pipeline {
         AWS_REGION   = 'us-west-1'
         ECR_REGISTRY = '026869448226.dkr.ecr.us-west-1.amazonaws.com'
         DEPLOY_DIR   = '/home/ubuntu/task-manager'
+        COMPOSE_FILE = 'app/docker-compose.prod.yml'
     }
 
     parameters {
@@ -22,6 +24,10 @@ pipeline {
                     if (!params.IMAGE_TAG?.trim()) {
                         error('IMAGE_TAG is required')
                     }
+
+                    if (!(params.IMAGE_TAG ==~ /[a-zA-Z0-9_.-]+/)) {
+                        error('IMAGE_TAG contains invalid characters')
+                    }
                 }
 
                 echo "New version: ${params.IMAGE_TAG}"
@@ -35,63 +41,109 @@ pipeline {
 
                     export IMAGE_TAG="${IMAGE_TAG}"
 
-                    # Get ECR permission using the EC2 IAM role
-                    aws ecr get-login-password --region "$AWS_REGION" \
-                      | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+                    # Use the production Compose file from the Jenkins checkout
+                    COMPOSE_PATH="$WORKSPACE/$COMPOSE_FILE"
+                    ENV_FILE="$DEPLOY_DIR/.env"
+                    TAG_FILE="$DEPLOY_DIR/.current_image_tag"
 
-                    # Remember the currently working version for rollback
-                    if [ -f "$DEPLOY_DIR/.current_image_tag" ]; then
-                      PREVIOUS_TAG=$(cat "$DEPLOY_DIR/.current_image_tag")
+                    # Verify required files exist
+                    test -f "$COMPOSE_PATH" || {
+                        echo "ERROR: Compose file not found: $COMPOSE_PATH"
+                        exit 1
+                    }
+
+                    test -f "$ENV_FILE" || {
+                        echo "ERROR: Environment file not found: $ENV_FILE"
+                        exit 1
+                    }
+
+                    # Ensure Jenkins can access deployment state
+                    test -w "$DEPLOY_DIR" || {
+                        echo "ERROR: Jenkins cannot write to $DEPLOY_DIR"
+                        exit 1
+                    }
+
+                    # Authenticate to ECR using the EC2 IAM role
+                    aws ecr get-login-password --region "$AWS_REGION" \
+                      | docker login \
+                          --username AWS \
+                          --password-stdin "$ECR_REGISTRY"
+
+                    # Remember the currently deployed version
+                    if [ -f "$TAG_FILE" ]; then
+                        PREVIOUS_TAG=$(cat "$TAG_FILE")
                     else
-                      PREVIOUS_TAG=""
+                        PREVIOUS_TAG=""
                     fi
 
                     echo "Previous version: ${PREVIOUS_TAG:-none}"
                     echo "Deploying version: $IMAGE_TAG"
 
-                    # Download the exact frontend and backend images from ECR
+                    # Pull the exact version from ECR
                     docker compose \
-                      --env-file "$DEPLOY_DIR/.env" \
-                      -f "$DEPLOY_DIR/docker-compose.yml" \
-                      pull frontend backend
+                      --env-file "$ENV_FILE" \
+                      -f "$COMPOSE_PATH" \
+                      pull
 
-                    # Start the new version
+                    # Start the application, including MySQL if required
                     docker compose \
-                      --env-file "$DEPLOY_DIR/.env" \
-                      -f "$DEPLOY_DIR/docker-compose.yml" \
-                      up -d frontend backend
+                      --env-file "$ENV_FILE" \
+                      -f "$COMPOSE_PATH" \
+                      up -d
 
-                    # Check that backend is healthy
-                    sleep 10
-
-                    if curl --fail --retry 10 --retry-all-errors --retry-delay 5 \
+                    # Verify backend health
+                    if curl --fail --silent --show-error \
+                      --retry 12 \
+                      --retry-connrefused \
+                      --retry-delay 5 \
                       http://localhost:8081/api/health; then
 
-                      echo "$IMAGE_TAG" > "$DEPLOY_DIR/.current_image_tag"
-                      echo "Deployment successful."
+                        printf '%s\\n' "$IMAGE_TAG" > "$TAG_FILE"
+                        echo "Deployment successful: $IMAGE_TAG"
 
                     else
-                      echo "Health check failed."
+                        echo "ERROR: Health check failed."
 
-                      # Restore previous version if one exists
-                      if [ -n "$PREVIOUS_TAG" ]; then
-                        export IMAGE_TAG="$PREVIOUS_TAG"
+                        # Restore the previous version if available
+                        if [ -n "$PREVIOUS_TAG" ]; then
+                            echo "Rolling back to $PREVIOUS_TAG"
 
-                        docker compose \
-                          --env-file "$DEPLOY_DIR/.env" \
-                          -f "$DEPLOY_DIR/docker-compose.yml" \
-                          pull frontend backend
+                            export IMAGE_TAG="$PREVIOUS_TAG"
 
-                        docker compose \
-                          --env-file "$DEPLOY_DIR/.env" \
-                          -f "$DEPLOY_DIR/docker-compose.yml" \
-                          up -d frontend backend
-                      fi
+                            docker compose \
+                              --env-file "$ENV_FILE" \
+                              -f "$COMPOSE_PATH" \
+                              pull
 
-                      exit 1
+                            docker compose \
+                              --env-file "$ENV_FILE" \
+                              -f "$COMPOSE_PATH" \
+                              up -d
+
+                            echo "Rollback attempted."
+                        else
+                            echo "No previous version is recorded; rollback unavailable."
+                        fi
+
+                        exit 1
                     fi
                 '''
             }
         }
     }
+
+    post {
+        success {
+            echo 'CI/CD deployment completed successfully.'
+        }
+
+        failure {
+            echo 'Deployment failed. Check the console output for the first ERROR.'
+        }
+
+        always {
+            echo 'Jenkins pipeline finished.'
+        }
+    }
 }
+```
