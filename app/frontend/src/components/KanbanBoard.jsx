@@ -22,7 +22,7 @@ export default function KanbanBoard({ tasksByStatus, onAddInColumn, onEdit, onDe
             ))}
           </div>
           <button type="button" className="kanban-add" onClick={() => onAddInColumn(status)}>
-            + Add a task
+            + Add task
           </button>
         </section>
       ))}
