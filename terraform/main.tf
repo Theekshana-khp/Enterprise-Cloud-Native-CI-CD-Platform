@@ -203,7 +203,7 @@ resource "aws_instance" "task_manager" {
 
     exec > >(tee -a /var/log/user-data-setup.log) 2>&1
 
-    # 1. Upd ate Ubuntu
+    # 1. Upd a te Ubuntu
     apt-get update
 
     # 2. Install Java, Docker, Compose and utilities
