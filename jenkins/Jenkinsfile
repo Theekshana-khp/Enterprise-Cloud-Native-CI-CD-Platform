@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION   = 'us-east-1'
-        ECR_REGISTRY = '474632925843.dkr.ecr.us-east-1.amazonaws.com'
+        AWS_REGION   = 'us-west-1'
+        ECR_REGISTRY = '026869448226.dkr.ecr.us-west-1.amazonaws.com'
         DEPLOY_DIR   = '/home/ubuntu/task-manager'
     }
 
@@ -41,7 +41,7 @@ pipeline {
 
                     # Remember the currently working version for rollback
                     if [ -f "$DEPLOY_DIR/.current_image_tag" ]; then
-                      PREVIOUS_TAG=$(cat "$DEPLOY_DIR/.current_image_tag")
+                      PREVIOUS_TAG=$(cat "$DEPLOY_DIR/.current_image_tag")+
                     else
                       PREVIOUS_TAG=""
                     fi
