@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
 
@@ -5,6 +6,7 @@ pipeline {
         AWS_REGION   = 'us-west-1'
         ECR_REGISTRY = '026869448226.dkr.ecr.us-west-1.amazonaws.com'
         DEPLOY_DIR   = '/home/ubuntu/task-manager'
+        COMPOSE_FILE = 'app/docker-compose.prod.yml'
     }
 
     parameters {
@@ -23,8 +25,7 @@ pipeline {
                         error('IMAGE_TAG is required')
                     }
                 }
-
-                echo "New version: ${params.IMAGE_TAG}"
+                echo "Deploying version: ${params.IMAGE_TAG}"
             }
         }
 
@@ -33,62 +34,57 @@ pipeline {
                 sh '''
                     set -eu
 
-                    export IMAGE_TAG="${IMAGE_TAG}"
+                    export IMAGE_TAG="$IMAGE_TAG"
 
-                    # Get ECR permission using the EC2 IAM role
-                    aws ecr get-login-password --region "$AWS_REGION" \
-                      | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+                    # Login to ECR using the EC2 IAM role
+                    aws ecr get-login-password --region "$AWS_REGION" |
+                        docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
-                    # Remember the currently working version for rollback
-                    if [ -f "$DEPLOY_DIR/.current_image_tag" ]; then
-                      PREVIOUS_TAG=$(cat "$DEPLOY_DIR/.current_image_tag")+
-                    else
-                      PREVIOUS_TAG=""
-                    fi
+                    # Save previous version for rollback
+                    PREVIOUS_TAG=$(cat "$DEPLOY_DIR/.current_image_tag" 2>/dev/null || true)
 
                     echo "Previous version: ${PREVIOUS_TAG:-none}"
-                    echo "Deploying version: $IMAGE_TAG"
+                    echo "New version: $IMAGE_TAG"
 
-                    # Download the exact frontend and backend images from ECR
-                    docker compose \
-                      --env-file "$DEPLOY_DIR/.env" \
-                      -f "$DEPLOY_DIR/docker-compose.yml" \
-                      pull frontend backend
+                    deploy() {
+                        export IMAGE_TAG="$1"
 
-                    # Start the new version
-                    docker compose \
-                      --env-file "$DEPLOY_DIR/.env" \
-                      -f "$DEPLOY_DIR/docker-compose.yml" \
-                      up -d frontend backend
+                        docker compose \
+                            --env-file "$DEPLOY_DIR/.env" \
+                            -f "$COMPOSE_FILE" pull frontend backend
 
-                    #  Check that backend is healthy
-                    sleep 10
+                        docker compose \
+                            --env-file "$DEPLOY_DIR/.env" \
+                            -f "$COMPOSE_FILE" up -d
+                    }
 
-                    if curl --fail --retry 10 --retry-all-errors --retry-delay 5 \
-                      http://localhost:8081/api/health; then
+                    # Deploy the new version and verify backend health
+                    if deploy "$IMAGE_TAG" &&
+                       curl --fail --retry 10 --retry-all-errors \
+                           --retry-delay 5 \
+                           http://localhost:8081/api/health; then
 
-                      echo "$IMAGE_TAG" > "$DEPLOY_DIR/.current_image_tag"
-                      echo "Deployment successful."
+                        echo "$IMAGE_TAG" > "$DEPLOY_DIR/.current_image_tag"
+                        echo "Deployment successful!"
 
                     else
-                      echo "Health check failed."
+                        echo "Deployment failed. Starting rollback..."
 
-                      # Restore previous version if one exists
-                      if [ -n "$PREVIOUS_TAG" ]; then
-                        export IMAGE_TAG="$PREVIOUS_TAG"
+                        if [ -n "$PREVIOUS_TAG" ]; then
+                            deploy "$PREVIOUS_TAG"
 
-                        docker compose \
-                          --env-file "$DEPLOY_DIR/.env" \
-                          -f "$DEPLOY_DIR/docker-compose.yml" \
-                          pull frontend backend
+                            if curl --fail --retry 10 --retry-all-errors \
+                                --retry-delay 5 \
+                                http://localhost:8081/api/health; then
+                                echo "Rollback successful."
+                            else
+                                echo "Rollback health check failed."
+                            fi
+                        else
+                            echo "No previous version available for rollback."
+                        fi
 
-                        docker compose \
-                          --env-file "$DEPLOY_DIR/.env" \
-                          -f "$DEPLOY_DIR/docker-compose.yml" \
-                          up -d frontend backend
-                      fi
-
-                      exit 1
+                        exit 1
                     fi
                 '''
             }
