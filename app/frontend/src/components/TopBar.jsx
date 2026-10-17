@@ -1,8 +1,10 @@
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { initials } from '../utils/format';
 
 export default function TopBar({ search, onSearchChange }) {
   const { user, logout } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
 
   return (
     <header className="topbar">
@@ -17,6 +19,18 @@ export default function TopBar({ search, onSearchChange }) {
         />
       </div>
       <div className="topbar-actions">
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={toggleTheme}
+          aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          title={isDark ? 'Light mode' : 'Dark mode'}
+        >
+          <span className="theme-toggle-track">
+            <span className={`theme-toggle-thumb${isDark ? ' is-dark' : ''}`} />
+          </span>
+          <span className="theme-toggle-label">{isDark ? '🌙 Dark' : '☀️ Light'}</span>
+        </button>
         <button type="button" className="icon-btn notification-btn" aria-label="Notifications">
           🔔
           <span className="notification-dot" />
